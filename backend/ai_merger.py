@@ -23,17 +23,23 @@ def ai_merge_documents(template_doc: Document, content_doc: Document) -> Documen
     content_texts = [p.text.strip() for p in content_all_paras if p.text.strip()]
     full_content = "\n".join(content_texts)
     
-    # AI Prompt oluşturma
+    # AI Prompt oluşturma — başlık tespiti (stil ADI veya BÜYÜK HARF)
+    heading_indices = set()
     prompt_lines = []
     for i, p in enumerate(template_paras):
         t = p.text.strip()
-        if t:
-            # Başlık karakteristiği taşıyan metinlere prompt seviyesinde koruma etiketi ekle
-            if t.isupper() and len(t) < 50:
-                prompt_lines.append(f"[{i}]: \"{t}\" (KORUMALI BAŞLIK - ASLA DEĞİŞTİRME, İÇERİĞİ BUNUN ALTINA _append İLE EKLE!)")
-            else:
-                prompt_lines.append(f"[{i}]: \"{t}\"")
-                
+        if not t:
+            continue
+        is_heading = (
+            (hasattr(p, 'style') and p.style and 'heading' in p.style.name.lower())
+            or (t.isupper() and len(t) < 60)
+        )
+        if is_heading:
+            heading_indices.add(i)
+            prompt_lines.append(f"[{i}]: \"{t}\" (KORUMALI BAŞLIK — ASLA DEĞİŞTİRME, BU BAŞLIĞIN ALTINA _append İLE EKLE!)")
+        else:
+            prompt_lines.append(f"[{i}]: \"{t}\"")
+
     template_structure = "\n".join(prompt_lines)
 
     prompt = f"""
@@ -49,20 +55,21 @@ YENİ İÇERİK:
 
 KURALLAR:
 1. Sonuç olarak AŞAĞIDAKİ GİBİ BİR JSON OBJESİ döndür. Asla markdown (```json) kullanma, doğrudan saf {{...}} objesi döndür.
-2. "changes": Şablonda zaten var olan, taslak olarak yazılmış veya doldurulması gereken (boş olan) satırları güncellediğin liste.
-   - ÇOK ÖNEMLİ: Şablondaki "AMAÇ", "KAPSAM", "TANIMLAR", "RAPORLAMALAR", "SÜREÇ" gibi BÜYÜK HARFLİ ANA BAŞLIKLARI veya etiketleri (Örn: "DJ GRUP MERKEZ") ASLA "changes" içine koyup DEĞİŞTİRME! Başlıklar "original_text" olarak bile changes içinde olmamalı (değişmemesi için hiç listeye alma).
-3. "appends": Eğer bir başlığın ALTINDA hazırda boş bir satır veya taslak metin YOKSA ve senin o başlığın altına yeni bir paragraf (veya paragraflar) EKLEMEN gerekiyorsa, bunu "appends" içinde yap. (Bu sayede yazılar başlık gibi mavi/kalın olmaz, normal siyah metin olarak başlığın altına eklenir).
-4. ÇOK ÖNEMLİ: Kendi ürettiğin, değiştirdiğin veya doldurduğun hiçbir metinde ASLA "DJ Grup Merkez", "DJ Grup", "DJ Gruba bağlı" gibi özel şirket isimleri KULLANMA. Bunun yerine "işletmemiz", "tesisimiz" veya "otelimiz" gibi ifadeler kullan.
-5. Eğer YENİ İÇERİK'te bir başlık için hiçbir bilgi yoksa, o konuya uygun, HK standartlarına yakışan 1-2 cümlelik profesyonel bir metni KENDİN OLUŞTUR ve mutlaka ilgili başlığın altına (veya "changes" ile taslak metne) ekle!
+2. "changes": Şablonda zaten var olan, taslak veya boş satırları güncellediğin liste.
+   - "(KORUMALI BAŞLIK)" etiketi olan hiçbir indeksi "changes" içine KOYMA. Başlıklar asla değişmeyecek.
+3. "appends": Bir başlığın altına yeni paragraf eklemek istiyorsan bunu "appends" içinde yap. Böylece eklenen metin normal siyah yazı olarak görünür, başlık stilini almaz.
+4. KESİNLİKLE YASAK — BAŞLIK KAYNAĞI: YENİ İÇERİK dosyasından (eski yazıdan) hiçbir başlık, bölüm adı veya madde numarası ALMA. Çıktıdaki TÜM başlıklar yalnızca ŞABLON PARAGRAFLARI listesindekilerden oluşur. Eski dosyada "5.1. SÜREÇ", "6. RAPORLAMALAR" gibi başlıklar olsa bile onları yeni başlık olarak EKLEME — içeriklerini uygun şablon başlığının altına yerleştir.
+5. ÇOK ÖNEMLİ: Ürettiğin hiçbir metinde "DJ Grup Merkez", "DJ Grup", "DJ Gruba bağlı" gibi şirket isimleri KULLANMA. Bunun yerine "işletmemiz", "tesisimiz" veya "otelimiz" kullan.
+6. Eğer bir şablon başlığı için içerikte bilgi yoksa, o konuya uygun HK standartlarında 1-2 cümle KENDIN OLUŞTUR ve "_append" ile ekle. Hiçbir başlığın altı boş kalmasın.
 
 ÖRNEK JSON ÇIKTISI:
 {{
   "changes": [
     {{
       "index": 23,
-      "original_text": "Bu prosedür DJ Gruba bağlı tüm işletmeleri kapsar.",
+      "original_text": "Bu prosedür tüm işletmeleri kapsar.",
       "new_text": "Bu prosedür işletmemizin tüm alanlarını kapsar.",
-      "reason": "Kapsam metni düzeltildi ve şirket ibaresi kaldırıldı."
+      "reason": "Kapsam metni güncellendi."
     }}
   ],
   "appends": [
@@ -70,10 +77,10 @@ KURALLAR:
       "parent_index": 20,
       "parent_text": "TANIMLAR",
       "new_paragraphs": [
-        "Bu prosedürde geçen 'Arıza' terimi,...",
-        "'HK Personeli' ise..."
+        "Bu prosedürde geçen 'Arıza' terimi her türlü teknik veya fiziksel kusuru ifade eder.",
+        "'HK Personeli' ise Kat Hizmetleri departmanında görevli tüm çalışanları kapsar."
       ],
-      "reason": "Tanımlar başlığının altı boştu, yeni tanımlar oluşturulup eklendi."
+      "reason": "Tanımlar başlığının altı boştu, HK standartlarına uygun tanımlar oluşturuldu."
     }}
   ]
 }}
@@ -109,11 +116,10 @@ KURALLAR:
             if idx < len(template_paras):
                 p = template_paras[idx]
                 
-                # PYTHON SEVİYESİNDE BAŞLIK KORUMASI
-                original_text = str(p.text).strip()
-                if original_text.isupper() and len(original_text) < 50:
-                    print(f"KORUMA AKTİF: AI başlığı değiştirmeye çalıştı engellendi. ({original_text} -> {new_text})")
-                    continue # Başlığı değiştirmeyi reddet
+                # PYTHON SEVİYESİNDE BAŞLIK KORUMASI (stil + büyük harf çift kontrol)
+                if idx in heading_indices:
+                    print(f"KORUMA AKTİF: AI başlığı değiştirmeye çalıştı engellendi. (idx={idx}, metin={p.text[:40]})")
+                    continue
                 
                 if new_text != p.text:
                     _replace_runs_text(p._element, new_text)
