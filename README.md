@@ -8,6 +8,9 @@
 - **Frontend**: Vite + TypeScript + Tailwind CSS v4
 - **Haberleşme**: Axios ile multipart dosya transferi
 
+## Uyarılar
+- **CORS:** Geliştirme (development) ortamında kolaylık olması açısından `backend/main.py` dosyasında `allow_origins=["*"]` ayarı yapılmıştır. Bu durum production ortamında güvenlik riski oluşturabilir. Canlıya (Production) geçerken sadece belirli frontend URL'lerine izin verilmelidir.
+
 ## 🚀 Kurulum ve Çalıştırma
 
 ### 1. Backend

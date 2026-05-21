@@ -93,8 +93,12 @@ KURALLAR:
         # Gelen eşleşmiş metinleri şablona yaz
         # 1. Var olan paragrafları güncelle
         for change in changes:
-            idx = int(change.get("index"))
-            new_text = str(change.get("new_text"))
+            idx_val = change.get("index")
+            if idx_val is None:
+                continue
+                
+            idx = int(idx_val)
+            new_text = str(change.get("new_text", ""))
             if idx < len(template_paras):
                 p = template_paras[idx]
                 if new_text != p.text:
@@ -105,7 +109,11 @@ KURALLAR:
         from docx.text.paragraph import Paragraph
         
         for append_obj in appends:
-            parent_idx = int(append_obj.get("parent_index"))
+            parent_idx_val = append_obj.get("parent_index")
+            if parent_idx_val is None:
+                continue
+                
+            parent_idx = int(parent_idx_val)
             new_paragraphs = append_obj.get("new_paragraphs", [])
             
             if parent_idx < len(template_paras):
@@ -120,5 +128,6 @@ KURALLAR:
 
     except Exception as e:
         print(f"AI Parse Error: {str(e)}\nResponse: {response.text}")
+        raise ValueError(f"Yapay zeka çıktısı işlenemedi: {str(e)}")
             
     return template_doc

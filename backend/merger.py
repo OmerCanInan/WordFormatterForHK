@@ -54,9 +54,7 @@ def merge_documents(template_doc: Document, content_doc: Document) -> Document:
     # 3. Replace text in template paragraphs
     for i, p in enumerate(template_paras):
         if i < len(content_texts):
-            _replace_runs_text(p._element, content_texts[i])
-        else:
-            _replace_runs_text(p._element, "") # Clear extra template paragraphs
+            _replace_runs_text(p._element, content_texts[i]) # Clear extra template paragraphs
             
     # 4. If content has more paragraphs than template, duplicate the last one
     if len(content_texts) > len(template_paras):
