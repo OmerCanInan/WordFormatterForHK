@@ -25,8 +25,15 @@ def ai_merge_documents(template_doc: Document, content_doc: Document) -> Documen
     
     # AI Prompt oluşturma
     prompt_lines = []
-    for i, text in enumerate(template_texts):
-        prompt_lines.append(f"[{i}]: {repr(text)}")
+    for i, p in enumerate(template_paras):
+        t = p.text.strip()
+        if t:
+            # Başlık karakteristiği taşıyan metinlere prompt seviyesinde koruma etiketi ekle
+            if t.isupper() and len(t) < 50:
+                prompt_lines.append(f"[{i}]: \"{t}\" (KORUMALI BAŞLIK - ASLA DEĞİŞTİRME, İÇERİĞİ BUNUN ALTINA _append İLE EKLE!)")
+            else:
+                prompt_lines.append(f"[{i}]: \"{t}\"")
+                
     template_structure = "\n".join(prompt_lines)
 
     prompt = f"""
@@ -101,6 +108,13 @@ KURALLAR:
             new_text = str(change.get("new_text", ""))
             if idx < len(template_paras):
                 p = template_paras[idx]
+                
+                # PYTHON SEVİYESİNDE BAŞLIK KORUMASI
+                original_text = str(p.text).strip()
+                if original_text.isupper() and len(original_text) < 50:
+                    print(f"KORUMA AKTİF: AI başlığı değiştirmeye çalıştı engellendi. ({original_text} -> {new_text})")
+                    continue # Başlığı değiştirmeyi reddet
+                
                 if new_text != p.text:
                     _replace_runs_text(p._element, new_text)
                     
